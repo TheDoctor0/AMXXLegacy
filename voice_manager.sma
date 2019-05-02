@@ -4,7 +4,7 @@
 #include <sqlx>
 
 #define PLUGIN  "Voice Manager"
-#define VERSION "1.0"
+#define VERSION "1.0.0"
 #define AUTHOR  "O'Zone"
 
 #define TASK_INFO 3872
@@ -15,7 +15,7 @@
 
 new const cmdMenuPlayer[][] = { "say /mute", "say_team /mute", "say /mutuj", "say_team /mutuj", "say /ucisz", "say_team /ucisz", "say /unmute", "say_team /unmute", "say /odmutuj", "say_team /odmutuj" };
 new const cmdMenuAdmin[][] = { "amx_mute", "amx_unmute", "amx_mute_menu", "amx_unmute_menu", "amx_gag", "amx_ungag" };
-new const cmdVoiceStatus[][] = { "say /vm", "say_team /vm", "say /glos", "say_team /glos" };
+new const cmdVoiceStatus[][] = { "say /vm", "say_team /vm", "say /voice", "say_team /voice", "say /glos", "say_team /glos" };
 
 enum _:menus { MENU_PLAYER, MENU_ADMIN };
 enum _:data { bool:INFO, bool:INFO_USED, bool:ALIVE, bool:INTER_VOICE, bool:LISTEN, bool:MUTED, bool:ADMIN, Trie:MUTES, PLAYER, MENU, SETTINGS[2], IP[16], NAME[32], STEAMID[35], SAFE_NAME[64] };
@@ -27,6 +27,8 @@ public plugin_init()
 {
 	register_plugin(PLUGIN, VERSION, AUTHOR);
 
+	register_cvar("vm_version", VERSION, FCVAR_SERVER);
+
 	bind_pcvar_string(create_cvar("vm_sql_host", "127.0.0.1", FCVAR_SPONLY|FCVAR_PROTECTED), cvarHost, charsmax(cvarHost));
 	bind_pcvar_string(create_cvar("vm_sql_user", "user", FCVAR_SPONLY|FCVAR_PROTECTED), cvarUser, charsmax(cvarUser));
 	bind_pcvar_string(create_cvar("vm_sql_pass", "password", FCVAR_SPONLY|FCVAR_PROTECTED), cvarPassword, charsmax(cvarPassword));
@@ -35,8 +37,8 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("vm_alive", "0"), cvarAlive); // 0: Alive teammates | 1: Alive players | 2: All teammates | 3: All players (Default: 0)
 	bind_pcvar_num(create_cvar("vm_dead", "1"), cvarDead); // 0: Dead teammates | 1: Dead players | 2: All teammates | 3: All players (Default: 1)
 	bind_pcvar_num(create_cvar("vm_info_time", "5"), cvarInfoTime); // Time in seconds for player to give info to his team - 0 to disable (Default: 5)
-	bind_pcvar_num(create_cvar("vm_admin_mute_menu", "1"), cvarAdminMuteMenu); // Admin mute menu for blocking micro/chat globally for players - 0 to disable (Default: 1)
-	bind_pcvar_num(create_cvar("vm_player_mute_menu", "1"), cvarPlayerMuteMenu); // Player mute menu for blocking other players micro by themself - 0 to disable (Default: 1)
+	bind_pcvar_num(create_cvar("vm_admin_mute_menu", "1"), cvarAdminMuteMenu); // Admin mute menu for blocking voice/chat globally for players - 0 to disable (Default: 1)
+	bind_pcvar_num(create_cvar("vm_player_mute_menu", "1"), cvarPlayerMuteMenu); // Player mute menu for blocking other players voice by themself - 0 to disable (Default: 1)
 	bind_pcvar_num(create_cvar("vm_admin_voice", "1"), cvarAdminVoice); // Admin command for talking to all players despite dead/alive settings - 0 to disable (Default: 1)
 	bind_pcvar_num(create_cvar("vm_admin_voice_override", "1"), cvarAdminVoiceOverride); // Override players settings so even players with disabled sound receive will hear admin - 0 to disable (Default: 1)
 	bind_pcvar_num(create_cvar("vm_admin_intervoice", "1"), cvarAdminInterVoice); // Admins voice chat - 0 to disable (Default: 1)
@@ -667,7 +669,7 @@ public sql_init()
 
 	new queryData[192];
 
-	formatex(queryData, charsmax(queryData), "CREATE TABLE IF NOT EXISTS `voice_manager` (`id` INT(11) AUTO_INCREMENT, `name` VARCHAR(35) NOT NULL, `muted` VARCHAR(35) NOT NULL, PRIMARY KEY(`id`));");
+	formatex(queryData, charsmax(queryData), "CREATE TABLE IF NOT EXISTS `voice_manager` (`id` INT(11) AUTO_INCREMENT, `name` VARCHAR(64) NOT NULL, `muted` VARCHAR(64) NOT NULL, PRIMARY KEY(`id`));");
 
 	new Handle:query = SQL_PrepareQuery(connection, queryData);
 
