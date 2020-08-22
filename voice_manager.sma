@@ -4,7 +4,7 @@
 #include <sqlx>
 
 #define PLUGIN  "Voice Manager"
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 #define AUTHOR  "O'Zone"
 
 #define TASK_INFO 3872
@@ -18,7 +18,7 @@ new const cmdMenuAdmin[][] = { "amx_mute", "amx_unmute", "amx_mute_menu", "amx_u
 new const cmdVoiceStatus[][] = { "say /vm", "say_team /vm", "say /voice", "say_team /voice", "say /glos", "say_team /glos" };
 
 enum _:menus { MENU_PLAYER, MENU_ADMIN };
-enum _:data { bool:INFO, bool:INFO_USED, bool:ALIVE, bool:INTER_VOICE, bool:LISTEN, bool:MUTED, bool:ADMIN, Trie:MUTES, PLAYER, MENU, SETTINGS[2], IP[16], NAME[32], STEAMID[35], SAFE_NAME[64] };
+enum _:data { bool:INFO, bool:INFO_USED, bool:ALIVE, bool:INTER_VOICE, bool:LISTEN, bool:MUTED, Trie:MUTES, PLAYER, MENU, SETTINGS[2], IP[16], NAME[32], STEAMID[35], SAFE_NAME[64] };
 
 new playerData[MAX_PLAYERS + 1][data], cvarHost[32], cvarUser[32], cvarPassword[32], cvarDatabase[32], cvarAlive, cvarDead, cvarInfoTime, cvarAdminMuteMenu, cvarPlayerMuteMenu,
 	cvarAdminVoice, cvarAdminVoiceOverride, cvarAdminListen, cvarAdminInterVoice, adminVoice, Trie:mutes, Handle:sql, bool:sqlConnection;
@@ -106,12 +106,6 @@ public client_putinserver(id)
 	set_task(0.1, "load_player_mutes", id + TASK_MUTES);
 }
 
-public amxbans_admin_connect(id)
-	client_authorized(id, "");
-
-public client_authorized(id)
-	playerData[id][ADMIN] = bool:(get_user_flags(id) & ADMIN_CHAT);
-
 public client_disconnected(id)
 {
 	remove_task(id + TASK_INFO);
@@ -130,7 +124,7 @@ public menu_player(id)
 
 public menu_admin(id)
 {
-	if (!cvarAdminMuteMenu || !sqlConnection) return PLUGIN_CONTINUE;
+	if (!cvarAdminMuteMenu || !sqlConnection || !(get_user_flags(id) & ADMIN_BAN)) return PLUGIN_CONTINUE;
 
 	menu_show(id, MENU_ADMIN);
 
@@ -174,7 +168,7 @@ public menu_mute(id)
 		if (id == i || !is_user_connected(i) || is_user_hltv(i) || is_user_bot(i)) continue;
 
 		if (playerData[id][MENU] == MENU_PLAYER && TrieKeyExists(playerData[id][MUTES], playerData[i][NAME])) continue;
-		else if (playerData[id][MENU] == MENU_ADMIN && (TrieKeyExists(mutes, playerData[i][NAME]) || playerData[i][MUTED] || playerData[i][ADMIN])) continue;
+		else if (playerData[id][MENU] == MENU_ADMIN && (TrieKeyExists(mutes, playerData[i][NAME]) || playerData[i][MUTED] || (get_user_flags(id) & ADMIN_BAN))) continue;
 
 		menu_additem(menu, playerData[i][NAME]);
 
@@ -385,7 +379,7 @@ public voice_status(id)
 
 public admin_voice_on(id)
 {
-	if (!playerData[id][ADMIN] || !cvarAdminVoice) return PLUGIN_HANDLED;
+	if (!(get_user_flags(id) & ADMIN_BAN) || !cvarAdminVoice) return PLUGIN_HANDLED;
 
 	if (adminVoice) {
 		client_print_color(id, id, "^x04[GLOS]^x01 Poczekaj, jeden z adminow wlasnie uzywa^x03 glosu admina^x01.");
@@ -409,7 +403,7 @@ public admin_voice_on(id)
 
 public admin_voice_off(id)
 {
-	if (!playerData[id][ADMIN] || !cvarAdminVoice) return PLUGIN_HANDLED;
+	if (!(get_user_flags(id) & ADMIN_BAN) || !cvarAdminVoice) return PLUGIN_HANDLED;
 
 	if (adminVoice != id) {
 		client_cmd(id, "-voicerecord");
@@ -426,12 +420,12 @@ public admin_voice_off(id)
 
 public admin_intervoice_on(id)
 {
-	if (!playerData[id][ADMIN] || !cvarAdminInterVoice) return PLUGIN_HANDLED;
+	if (!(get_user_flags(id) & ADMIN_BAN) || !cvarAdminInterVoice) return PLUGIN_HANDLED;
 
 	playerData[id][INTER_VOICE] = true;
 
 	for (new player = 1; player <= MAX_PLAYERS; player++) {
-		if (!is_user_connected(player) || is_user_bot(player) || !playerData[player][ADMIN]) continue;
+		if (!is_user_connected(player) || is_user_bot(player) || !(get_user_flags(id) & ADMIN_BAN)) continue;
 
 		if (player != id) client_print_color(player, id, "^x04[GLOS]^x03 %s^x01 mowi do adminow.", playerData[id][NAME]);
 		else client_print_color(player, id, "^x04[GLOS]^x01 Mowisz do^x03 adminow^x01.");
@@ -455,7 +449,7 @@ public admin_intervoice_off(id)
 
 public admin_listen_on(id)
 {
-	if (!playerData[id][ADMIN] || !cvarAdminListen) return PLUGIN_HANDLED;
+	if (!(get_user_flags(id) & ADMIN_BAN) || !cvarAdminListen) return PLUGIN_HANDLED;
 
 	playerData[id][LISTEN] = true;
 
@@ -521,9 +515,9 @@ public set_client_listening(receiver, sender, bool:listen)
 	}
 
 	if (playerData[sender][INTER_VOICE]) {
-		engfunc(EngFunc_SetClientListening, receiver, sender, playerData[receiver][ADMIN]);
+		engfunc(EngFunc_SetClientListening, receiver, sender, (get_user_flags(receiver) & ADMIN_BAN));
 
-		forward_return(FMV_CELL, playerData[receiver][ADMIN]);
+		forward_return(FMV_CELL, (get_user_flags(receiver) & ADMIN_BAN));
 
 		return FMRES_SUPERCEDE;
 	}
